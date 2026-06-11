@@ -1,0 +1,139 @@
+{
+  "attachments": {
+    "events": {
+      "33840322": {
+        "eventId": 33840322,
+        "name": "Los Angeles Lakers @ Boston Celtics",
+        "openDate": "2026-06-12T00:30:00.000Z",
+        "competitionId": 10547864,
+        "inPlay": false
+      }
+    },
+    "markets": {
+      "1.100000001": {
+        "marketId": "1.100000001",
+        "eventId": 33840322,
+        "marketName": "Moneyline",
+        "marketType": "MONEY_LINE",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510001,
+            "runnerName": "Los Angeles Lakers",
+            "handicap": 0,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": 240, "americanOddsInt": 240},
+              "decimalDisplayOdds": {"decimalOdds": 3.4},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 3.4}}
+            }
+          },
+          {
+            "selectionId": 510002,
+            "runnerName": "Boston Celtics",
+            "handicap": 0,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -298, "americanOddsInt": -298},
+              "decimalDisplayOdds": {"decimalOdds": 1.34},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.3355}}
+            }
+          }
+        ]
+      },
+      "1.100000007": {
+        "marketId": "1.100000007",
+        "eventId": 33840322,
+        "marketName": "LeBron James - Points",
+        "marketType": "PLAYER_A_-_POINTS",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510013,
+            "runnerName": "Over 27.5",
+            "handicap": 27.5,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": "-110"},
+              "trueOdds": {"decimalOdds": {"decimalOdds": "1.9091"}}
+            }
+          },
+          {
+            "selectionId": 510014,
+            "runnerName": "Under 27.5",
+            "handicap": 27.5,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -110, "americanOddsInt": -110},
+              "decimalDisplayOdds": {"decimalOdds": 1.91},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.9091}}
+            }
+          }
+        ]
+      },
+      "1.100000008": {
+        "marketId": "1.100000008",
+        "eventId": 33840322,
+        "marketName": "Player Points Milestones",
+        "marketType": "PLAYER_POINTS_MILESTONES",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 1,
+        "runners": [
+          {
+            "selectionId": 510015,
+            "runnerName": "LeBron James 30+ Points",
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": "+105"},
+              "decimalDisplayOdds": {"decimalOdds": 2.05}
+            }
+          }
+        ]
+      },
+      "1.100000009": {
+        "marketId": "1.100000009",
+        "eventId": 33840322,
+        "marketName": "Player Points Milestones",
+        "marketType": "PLAYER_POINTS_MILESTONES",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 1,
+        "runners": [
+          {
+            "selectionId": 510016,
+            "runnerName": "Anthony Davis 30+ Points",
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOddsInt": 150},
+              "decimalDisplayOdds": {"decimalOdds": 2.5}
+            }
+          }
+        ]
+      },
+      "1.100000010": {
+        "marketId": "1.100000010",
+        "eventId": 33840322,
+        "marketName": "LeBron James To Record A Triple-Double",
+        "marketType": "PLAYER_A_TRIPLE_DOUBLE",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 1,
+        "runners": [
+          {
+            "selectionId": 510017,
+            "runnerName": "Yes",
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "decimalDisplayOdds": {"decimalOdds": 5.5}
+            }
+          }
+        ]
+      }
+    }
+  }
+}

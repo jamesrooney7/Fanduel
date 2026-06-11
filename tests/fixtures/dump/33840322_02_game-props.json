@@ -1,0 +1,65 @@
+{
+  "attachments": {
+    "events": {
+      "33840322": {
+        "eventId": 33840322,
+        "name": "Los Angeles Lakers @ Boston Celtics",
+        "openDate": "2026-06-12T00:30:00.000Z",
+        "competitionId": 10547864,
+        "inPlay": false
+      }
+    },
+    "markets": {
+      "1.100000011": {
+        "marketId": "1.100000011",
+        "eventId": 33840322,
+        "marketName": "Winning Margin",
+        "marketType": "WINNING_MARGIN",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 1,
+        "runners": [
+          {
+            "selectionId": 510020,
+            "runnerName": "Boston Celtics by 1-5",
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "oddsBucket": {"weirdNewFormat": [1, 2, 3]}
+            }
+          }
+        ]
+      },
+      "1.100000012": {
+        "marketId": "1.100000012",
+        "eventId": 33840322,
+        "marketName": "Will There Be Overtime?",
+        "marketType": "OVERTIME_YES_NO",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510021,
+            "runnerName": "Yes",
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": 950, "americanOddsInt": 950},
+              "decimalDisplayOdds": {"decimalOdds": 10.5},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 10.5}}
+            }
+          },
+          {
+            "selectionId": 510022,
+            "runnerName": "No",
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -2500, "americanOddsInt": -2500},
+              "decimalDisplayOdds": {"decimalOdds": 1.04},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.04}}
+            }
+          }
+        ]
+      }
+    }
+  }
+}

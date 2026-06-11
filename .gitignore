@@ -1,0 +1,13 @@
+# Secrets / local config — never commit these
+.env
+service_account.json
+
+# Scraper output
+dumps/
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

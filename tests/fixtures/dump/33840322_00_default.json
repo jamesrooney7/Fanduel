@@ -1,0 +1,182 @@
+{
+  "layout": {
+    "tabs": {
+      "popular": {"title": "Popular", "position": 1},
+      "player-props": {"title": "Player Props", "position": 2},
+      "game-props": {"title": "Game Props", "position": 3}
+    }
+  },
+  "attachments": {
+    "events": {
+      "33840322": {
+        "eventId": 33840322,
+        "name": "Los Angeles Lakers @ Boston Celtics",
+        "openDate": "2026-06-12T00:30:00.000Z",
+        "competitionId": 10547864,
+        "inPlay": false
+      }
+    },
+    "markets": {
+      "1.100000001": {
+        "marketId": "1.100000001",
+        "eventId": 33840322,
+        "marketName": "Moneyline",
+        "marketType": "MONEY_LINE",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510001,
+            "runnerName": "Los Angeles Lakers",
+            "handicap": 0,
+            "runnerStatus": "ACTIVE",
+            "sortPriority": 1,
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": 240, "americanOddsInt": 240},
+              "decimalDisplayOdds": {"decimalOdds": 3.4},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 3.4}}
+            }
+          },
+          {
+            "selectionId": 510002,
+            "runnerName": "Boston Celtics",
+            "handicap": 0,
+            "runnerStatus": "ACTIVE",
+            "sortPriority": 2,
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -298, "americanOddsInt": -298},
+              "decimalDisplayOdds": {"decimalOdds": 1.34},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.3355}}
+            }
+          }
+        ]
+      },
+      "1.100000002": {
+        "marketId": "1.100000002",
+        "eventId": 33840322,
+        "marketName": "Spread Betting",
+        "marketType": "MATCH_HANDICAP_(2-WAY)",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510003,
+            "runnerName": "Los Angeles Lakers",
+            "handicap": 6.5,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -110, "americanOddsInt": -110},
+              "decimalDisplayOdds": {"decimalOdds": 1.91},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.9091}}
+            }
+          },
+          {
+            "selectionId": 510004,
+            "runnerName": "Boston Celtics",
+            "handicap": -6.5,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -110, "americanOddsInt": -110},
+              "decimalDisplayOdds": {"decimalOdds": 1.91},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.9091}}
+            }
+          }
+        ]
+      },
+      "1.100000003": {
+        "marketId": "1.100000003",
+        "eventId": 33840322,
+        "marketName": "Total Points",
+        "marketType": "TOTAL_POINTS_(OVER/UNDER)",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510005,
+            "runnerName": "Over 224.5",
+            "handicap": 224.5,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -112, "americanOddsInt": -112},
+              "decimalDisplayOdds": {"decimalOdds": 1.89},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.8929}}
+            }
+          },
+          {
+            "selectionId": 510006,
+            "runnerName": "Under 224.5",
+            "handicap": 224.5,
+            "runnerStatus": "ACTIVE",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -108, "americanOddsInt": -108},
+              "decimalDisplayOdds": {"decimalOdds": 1.93},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.9259}}
+            }
+          }
+        ]
+      },
+      "1.100000004": {
+        "marketId": "1.100000004",
+        "eventId": 33840322,
+        "marketName": "Race To 20 Points",
+        "marketType": "RACE_TO_20_POINTS",
+        "marketStatus": "SUSPENDED",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "inPlay": true,
+        "numberOfRunners": 2,
+        "runners": [
+          {
+            "selectionId": 510007,
+            "runnerName": "Los Angeles Lakers",
+            "runnerStatus": "SUSPENDED",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": 184, "americanOddsInt": 184},
+              "decimalDisplayOdds": {"decimalOdds": 2.84},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 2.84}}
+            }
+          },
+          {
+            "selectionId": 510008,
+            "runnerName": "Boston Celtics",
+            "runnerStatus": "SUSPENDED",
+            "winRunnerOdds": {
+              "americanDisplayOdds": {"americanOdds": -240, "americanOddsInt": -240},
+              "decimalDisplayOdds": {"decimalOdds": 1.42},
+              "trueOdds": {"decimalOdds": {"decimalOdds": 1.4167}}
+            }
+          }
+        ]
+      },
+      "1.100000005": {
+        "marketId": "1.100000005",
+        "eventId": 33840322,
+        "marketName": "Both Teams To Score 120+ Points",
+        "marketType": "BOTH_TEAMS_TO_SCORE_120_POINTS",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "sgpMarket": true,
+        "numberOfRunners": 1,
+        "runners": [
+          {
+            "selectionId": 510009,
+            "runnerName": "Yes",
+            "runnerStatus": "ACTIVE"
+          }
+        ]
+      },
+      "1.100000006": {
+        "marketId": "1.100000006",
+        "eventId": 33840322,
+        "marketName": "Series Correct Score",
+        "marketType": "SERIES_CORRECT_SCORE",
+        "marketStatus": "OPEN",
+        "marketTime": "2026-06-12T00:30:00.000Z",
+        "numberOfRunners": 0,
+        "runners": []
+      }
+    }
+  }
+}
