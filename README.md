@@ -1,20 +1,20 @@
-# FanDuel Game Scraper → Google Sheets
+# FanDuel Game Scraper → CSV
 
 Point it at one FanDuel game and it grabs **every bet currently offered** on that
 game — moneyline, spreads, totals, every player prop, game prop, and alternate
-line, across every tab of the event page — and writes them as one tidy snapshot
-into a tab of your Google Sheet.
+line, across every tab of the event page — and saves them to a **CSV** you can
+open in Excel, Numbers, or Google Sheets.
 
 ```
 $ python -m fanduel_scraper "https://sportsbook.fanduel.com/basketball/nba/lakers-@-celtics-33840322"
 Fetching event 33840322 (default tab) ...
 Found 6 additional tab(s): player-props, game-props, ...
 Scraped 'Los Angeles Lakers @ Boston Celtics': 7 tab(s), 412 market(s), 1238 selection(s).
-Wrote worksheet: https://docs.google.com/spreadsheets/d/.../edit#gid=183920114
+Wrote CSV: /home/you/fanduel/los-angeles-lakers-boston-celtics_33840322_2026-06-11_1830.csv
 ```
 
-Each run adds a **new worksheet** named for the game and the time you ran it, so
-you can snapshot the same game repeatedly and compare.
+No accounts, no API keys, no setup — install it and run. (If you'd rather it
+write straight into a Google Sheet, that's an option too — see the very bottom.)
 
 ---
 
@@ -44,75 +44,40 @@ office networks. Run it from home.
 Requires **Python 3.10+**.
 
 ```bash
+git clone https://github.com/jamesrooney7/fanduel.git
+cd fanduel
+git checkout claude/amazing-euler-s71b7e
+
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 ---
 
-## Google Sheets setup (one time, ~5 minutes)
-
-The tool writes to your spreadsheet through a Google **service account** — a
-robot Google account with its own credentials. You create it once.
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and
-   create a project (or pick an existing one).
-2. Enable two APIs for that project (search each by name in the console, click
-   **Enable**):
-   - **Google Sheets API**
-   - **Google Drive API**
-3. Go to **IAM & Admin → Service Accounts → Create service account**. Give it
-   any name (e.g. `fanduel-scraper`) and click **Done** — you don't need to
-   grant it any project roles.
-4. Open the new service account → **Keys** tab → **Add key → Create new key →
-   JSON**. A `.json` file downloads.
-5. Save that file as **`service_account.json`** in this project's folder.
-   (It's already in `.gitignore`, so it won't be committed.)
-6. Create a Google Sheet to receive the data (sign in as your normal account,
-   e.g. `jamesrooney7@gmail.com`). A blank spreadsheet is fine.
-7. **Share the spreadsheet with the service account.** Open
-   `service_account.json`, copy the `client_email` value (it looks like
-   `fanduel-scraper@your-project.iam.gserviceaccount.com`), click **Share** in
-   the spreadsheet, paste that address, and give it **Editor** access.
-   *This step is what trips people up — if the tool says it can't open the
-   sheet, it's almost always because this share is missing. The error message
-   prints the exact address to share with.*
-8. Copy the spreadsheet's URL from your browser.
-
----
-
-## Configure
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-| Key | What it is |
-|---|---|
-| `FANDUEL_STATE` | The state subdomain to query — use the state you're physically in (`nj`, `pa`, `mi`, `il`, `co`, `az`, `ny`, …). |
-| `GOOGLE_SERVICE_ACCOUNT_FILE` | Path to your key file (default `service_account.json`). |
-| `GOOGLE_SPREADSHEET` | The spreadsheet URL (or just its ID) from step 8. |
-| `FANDUEL_APP_KEY` | Leave commented out unless FanDuel rotates its public key (rare). |
-
-Any of these can be overridden per run with a command-line flag.
-
----
-
 ## Usage
+
+Open the game on sportsbook.fanduel.com, copy the URL, and pass it in:
 
 ```bash
 # From a full game URL (copy it straight from your browser):
 python -m fanduel_scraper "https://sportsbook.fanduel.com/basketball/nba/lakers-@-celtics-33840322"
 
-# From just the numeric event id (the number at the end of the URL):
+# Or from just the numeric event id (the number at the end of the URL):
 python -m fanduel_scraper 33840322
+```
 
-# Override the state for this run:
+A CSV named for the game and the time you ran it appears in the current folder.
+Run it again whenever you want a fresh snapshot — each run writes a new file.
+
+Useful options:
+
+```bash
+# Save the CSV to a specific path:
+python -m fanduel_scraper 33840322 --csv ~/Desktop/lakers-celtics.csv
+
+# Tell it which state you're in (default is nj):
 python -m fanduel_scraper 33840322 --state pa
-
-# Write to a specific spreadsheet instead of the one in .env:
-python -m fanduel_scraper 33840322 --spreadsheet "https://docs.google.com/spreadsheets/d/.../edit"
 
 # Save the raw API responses while scraping (for debugging — see below):
 python -m fanduel_scraper 33840322 --dump-raw dumps/
@@ -121,16 +86,17 @@ python -m fanduel_scraper 33840322 --dump-raw dumps/
 python -m fanduel_scraper --help
 ```
 
-On success you'll get a summary line and a link to the new worksheet. The
-columns are:
+### What's in the CSV
+
+One row per selection, with these columns:
 
 `scrape_time_utc, event_id, event_name, event_start_utc, tab, market_id,
 market_name, market_type, market_status, selection_id, runner_name, handicap,
 american_odds, decimal_odds, runner_status`
 
 Odds are written as numbers (e.g. `-110`, `3.4`) so you can sort and filter
-them in Sheets. Suspended markets and selections are included with their status
-in the `market_status` / `runner_status` columns — nothing is filtered out.
+them. Suspended markets and selections are included with their status in the
+`market_status` / `runner_status` columns — nothing is filtered out.
 
 ---
 
@@ -139,17 +105,52 @@ in the `market_status` / `runner_status` columns — nothing is filtered out.
 | Symptom | What it means / what to do |
 |---|---|
 | **`error: FanDuel rejected the request (HTTP 403)`** | You're not on an accepted connection. Run from a **US residential** network in a **legal state**, turn off any **VPN**, and make sure `--state` matches where you are. Cloud/datacenter IPs are always blocked. |
-| **`error: Could not open the spreadsheet`** | The sheet isn't shared with the service account (or the ID/URL is wrong). The message prints the `client_email` — share the sheet with that address as **Editor**. |
 | **`error: Event ... was not found`** | The game may have ended or been removed, or the URL/ID is wrong. Open the game in your browser and copy the URL again. |
-| **`error: ... did not match the expected shape` (schema drift)** | FanDuel changed their internal API. Re-run with `--dump-raw dumps/`, then send the JSON files from `dumps/` so the parser can be updated. As a stopgap you can still capture data locally with the hidden `--csv out.csv` flag. |
-| **`error: Google Sheets API quota hit`** | You ran it many times in a minute. Wait ~60s and retry (one run uses only 2–3 write calls). |
+| **`error: ... did not match the expected shape` (schema drift)** | FanDuel changed their internal API. Re-run with `--dump-raw dumps/`, then send the JSON files from `dumps/` so the parser can be updated. |
 | **Odds columns are blank for some bets** | Some selections (e.g. same-game-parlay-only markets) genuinely have no standalone price; those are included with blank odds. If *everything* is blank, it's likely schema drift — use `--dump-raw`. |
-| **FanDuel changed its public key** | Uncomment `FANDUEL_APP_KEY` in `.env` and set the new value (find it in the network requests on sportsbook.fanduel.com). |
+| **FanDuel changed its public key** | Set `FANDUEL_APP_KEY` (see `.env.example`) to the new value (find it in the network requests on sportsbook.fanduel.com). |
 
 ### Exit codes
 
 `0` success · `2` bad event URL/ID · `3` geo-blocked (403) · `4` event not found ·
-`5` schema drift · `6` Google Sheets problem · `7` network/connection problem.
+`5` schema drift · `6` output problem · `7` network/connection problem.
+
+---
+
+## Optional: write to Google Sheets
+
+Prefer the data to land straight in a spreadsheet instead of a CSV file? Set up
+a Google **service account** (a robot Google account) once, then set
+`GOOGLE_SPREADSHEET` and every run writes a new tab into your sheet.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), create a
+   project (or use an existing one).
+2. Enable **Google Sheets API** *and* **Google Drive API** (search each by name,
+   click **Enable**).
+3. **IAM & Admin → Service Accounts → Create service account.** Any name; no
+   roles needed.
+4. Open it → **Keys → Add key → Create new key → JSON.** Save the downloaded
+   file as **`service_account.json`** in this project folder (it's gitignored).
+5. Create a Google Sheet (a blank one is fine) and copy its URL.
+6. **Share the sheet with the service account.** Open `service_account.json`,
+   copy the `client_email` value (like
+   `fanduel-scraper@your-project.iam.gserviceaccount.com`), click **Share** in
+   the spreadsheet, paste it, give **Editor**. *This is the step people miss —
+   if the tool says it can't open the sheet, it's almost always this. The error
+   prints the exact address to share with.*
+7. `cp .env.example .env`, then set `GOOGLE_SPREADSHEET` to your sheet's URL (and
+   uncomment `GOOGLE_SERVICE_ACCOUNT_FILE`).
+
+Now `python -m fanduel_scraper <game>` writes a new worksheet instead of a CSV.
+You can verify the wiring without a live FanDuel connection using the bundled
+sample data:
+
+```bash
+python -m fanduel_scraper 33840322 --from-dump tests/fixtures/dump
+```
+
+That writes a sample worksheet into your sheet. (Pass `--csv out.csv` to force a
+CSV at any time, even when a spreadsheet is configured.)
 
 ---
 
@@ -171,13 +172,12 @@ python -m pytest          # full test suite (no network needed)
 ```
 
 Tests run entirely against bundled fixtures in `tests/fixtures/dump/`, which are
-saved in the exact format `--dump-raw` produces. That means the debugging loop
-is:
+saved in the exact format `--dump-raw` produces. The debugging loop for schema
+drift is:
 
 1. User hits schema drift → re-runs with `--dump-raw dumps/`.
 2. Sends the `dumps/` files.
-3. We replay them offline with the hidden flag
-   `python -m fanduel_scraper <id> --from-dump dumps/ --csv /tmp/out.csv`,
+3. We replay them offline with `python -m fanduel_scraper <id> --from-dump dumps/`,
    fix `fanduel_scraper/parser.py`, and drop the dump in as a new test fixture.
 
 All knowledge of FanDuel's JSON shape lives in `fanduel_scraper/parser.py`, so

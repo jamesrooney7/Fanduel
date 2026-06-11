@@ -1,10 +1,23 @@
 import csv
+from datetime import datetime
 
-from fanduel_scraper.csv_out import write_csv
+from fanduel_scraper.csv_out import suggest_csv_filename, write_csv
 from fanduel_scraper.models import HEADER, TabPayload
 from fanduel_scraper.parser import parse_event
 
 EVENT_ID = 33840322
+
+
+def test_suggest_csv_filename():
+    name = suggest_csv_filename(
+        "Los Angeles Lakers @ Boston Celtics", 33840322, datetime(2026, 6, 11, 18, 30)
+    )
+    assert name == "los-angeles-lakers-boston-celtics_33840322_2026-06-11_1830.csv"
+
+
+def test_suggest_csv_filename_empty_name():
+    name = suggest_csv_filename("", 5, datetime(2026, 1, 2, 3, 4))
+    assert name == "fanduel-event_5_2026-01-02_0304.csv"
 
 
 def test_csv_roundtrip(tmp_path, load_fixture):

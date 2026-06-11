@@ -6,6 +6,7 @@ import argparse
 import logging
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import __version__
 from .config import Config, load_config
@@ -18,8 +19,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m fanduel_scraper",
         description=(
-            "Snapshot every bet FanDuel currently offers on one game into a "
-            "Google Sheet."
+            "Snapshot every bet FanDuel currently offers on one game. "
+            "Writes a CSV by default; can write to Google Sheets instead."
+        ),
+        epilog=(
+            "By default a CSV is saved in the current folder. To write to Google "
+            "Sheets instead, set GOOGLE_SPREADSHEET (see the README)."
         ),
     )
     p.add_argument("event", metavar="EVENT", help="FanDuel game URL or numeric event id")
@@ -32,7 +37,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--spreadsheet",
         default=None,
         metavar="ID_OR_URL",
-        help="Google spreadsheet to write into (or set GOOGLE_SPREADSHEET in .env)",
+        help=(
+            "write to this Google spreadsheet instead of a CSV (or set "
+            "GOOGLE_SPREADSHEET in .env). Requires the one-time setup in the README."
+        ),
     )
     p.add_argument(
         "--service-account",
@@ -51,10 +59,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         metavar="DIR",
         help="save every raw FanDuel response into DIR (for debugging)",
     )
+    p.add_argument(
+        "--csv",
+        default=None,
+        metavar="PATH",
+        help="write the CSV to PATH (default: an auto-named CSV in the current folder)",
+    )
     p.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     p.add_argument("--version", action="version", version=f"fanduel_scraper {__version__}")
-    # Debugging escape hatches (hidden from --help):
-    p.add_argument("--csv", default=None, metavar="PATH", help=argparse.SUPPRESS)
+    # Debugging escape hatch (hidden from --help):
     p.add_argument("--from-dump", default=None, metavar="DIR", help=argparse.SUPPRESS)
     return p
 
@@ -96,21 +109,25 @@ def _run(event_ref: str, config: Config) -> int:
         tab_payloads, event_id, scrape_time.strftime("%Y-%m-%dT%H:%M:%SZ")
     )
     summary = _summarize(result)
+    when_local = _to_local(scrape_time, config.timezone)
 
-    if config.csv_path:
-        from .csv_out import write_csv
+    # CSV is the zero-setup default. Google Sheets is used only when a
+    # spreadsheet is configured and the user didn't force CSV with --csv.
+    if config.spreadsheet and config.csv_path is None:
+        from .sheets import SheetsWriter
 
-        write_csv(config.csv_path, result.rows)
-        print(f"{summary}\nWrote CSV: {config.csv_path}")
+        writer = SheetsWriter(config.service_account_file, config.spreadsheet)
+        url = writer.write_snapshot(result.event, result.rows, when_local)
+        print(f"{summary}\nWrote worksheet: {url}")
         return 0
 
-    from .sheets import SheetsWriter
+    from .csv_out import suggest_csv_filename, write_csv
 
-    writer = SheetsWriter(config.service_account_file, config.spreadsheet or "")
-    url = writer.write_snapshot(
-        result.event, result.rows, _to_local(scrape_time, config.timezone)
+    path = config.csv_path or Path(
+        suggest_csv_filename(result.event.name, event_id, when_local)
     )
-    print(f"{summary}\nWrote worksheet: {url}")
+    write_csv(path, result.rows)
+    print(f"{summary}\nWrote CSV: {path.resolve()}")
     return 0
 
 
