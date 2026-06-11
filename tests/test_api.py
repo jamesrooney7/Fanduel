@@ -17,6 +17,7 @@ from fanduel_scraper.errors import (
     EventNotFoundError,
     GeoBlockedError,
     NetworkError,
+    SchemaDriftError,
     ScraperError,
 )
 
@@ -54,6 +55,7 @@ def test_build_params_with_tab():
 @pytest.mark.parametrize(
     ("status", "expected"),
     [
+        (400, SchemaDriftError),
         (403, GeoBlockedError),
         (451, GeoBlockedError),
         (404, EventNotFoundError),
@@ -62,6 +64,20 @@ def test_build_params_with_tab():
 )
 def test_classify_http_error(status, expected):
     assert isinstance(classify_http_error(status, ""), expected)
+
+
+def test_400_is_not_retried():
+    calls = []
+
+    def transport(url, params, timeout):
+        calls.append(1)
+        return FakeResponse(400, "Bad Request")
+
+    client, sleeps = make_client(transport)
+    with pytest.raises(SchemaDriftError):
+        client._request_with_retries({})
+    assert len(calls) == 1  # deterministic — no retries
+    assert sleeps == []
 
 
 def test_retries_then_success():
@@ -155,11 +171,11 @@ def test_fetch_event_walks_all_tabs():
     transport = make_tab_transport()
     client, sleeps = make_client(transport)
     payloads = client.fetch_event(EVENT_ID)
-    # no-tab layout fetch + every discovered tab (including the default 'popular')
-    assert [p.tab for p in payloads] == ["default", "popular", "player-props", "game-props"]
-    assert transport.calls == [None, "popular", "player-props", "game-props"]
-    # One polite jittered delay before each tab request.
-    assert len(sleeps) == 3
+    # Bootstrap with 'popular' (carries the layout), then the other tabs.
+    assert [p.tab for p in payloads] == ["popular", "player-props", "game-props"]
+    assert transport.calls == ["popular", "player-props", "game-props"]
+    # One polite jittered delay before each non-bootstrap tab request.
+    assert len(sleeps) == 2
     assert all(0.5 <= s <= 1.5 for s in sleeps)
 
 
@@ -167,7 +183,7 @@ def test_fetch_event_skips_failing_secondary_tab():
     transport = make_tab_transport(failures={"player-props": FakeResponse(500, "oops")})
     client, sleeps = make_client(transport)
     payloads = client.fetch_event(EVENT_ID)
-    assert [p.tab for p in payloads] == ["default", "popular", "game-props"]
+    assert [p.tab for p in payloads] == ["popular", "game-props"]
 
 
 def test_fetch_event_aborts_on_geo_block_mid_walk():
@@ -185,13 +201,12 @@ def test_dump_raw_writes_files(tmp_path):
     client.fetch_event(EVENT_ID)
     names = sorted(p.name for p in tmp_path.iterdir())
     assert names == [
-        "33840322_00_default.json",
-        "33840322_01_popular.json",
-        "33840322_02_player-props.json",
-        "33840322_03_game-props.json",
+        "33840322_00_popular.json",
+        "33840322_01_player-props.json",
+        "33840322_02_game-props.json",
     ]
     # Dumps are the exact bytes FanDuel sent, so they re-parse as JSON.
-    json.loads((tmp_path / "33840322_00_default.json").read_text(encoding="utf-8"))
+    json.loads((tmp_path / "33840322_00_popular.json").read_text(encoding="utf-8"))
 
 
 def test_load_dump_roundtrip(tmp_path):

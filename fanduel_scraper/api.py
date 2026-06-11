@@ -55,6 +55,11 @@ BROWSER_HEADERS = {
 RETRY_BACKOFF = (1.0, 2.0, 4.0)  # waits between the 4 total attempts
 RATE_LIMIT_BACKOFF = 10.0
 
+# The endpoint requires a tab; "Popular" is FanDuel's standard default tab and
+# every event-page response carries the full layout, so we bootstrap with it to
+# discover the rest of the tabs.
+DEFAULT_TAB = "popular"
+
 
 def build_params(app_key: str, event_id: int, tab: str | None = None) -> dict[str, str]:
     params = {
@@ -90,6 +95,14 @@ def classify_http_error(status: int, body_snippet: str = "") -> ScraperError:
                 "the event id is the number at the end."
             ),
         )
+    if status == 400:
+        return SchemaDriftError(
+            "FanDuel rejected the request as malformed (HTTP 400).",
+            hint=(
+                "A tab or query parameter is probably no longer valid. Re-run with "
+                "--dump-raw dumps/ and share the output so it can be updated."
+            ),
+        )
     return NetworkError(f"Unexpected HTTP {status} from FanDuel: {body_snippet!r}")
 
 
@@ -122,27 +135,28 @@ class FanDuelClient:
         self._transport = transport or _build_curl_cffi_transport(config)
 
     def fetch_event(self, event_id: int) -> list[TabPayload]:
-        """Fetch the layout, discover every tab, then fetch each tab's markets.
+        """Fetch the default tab, discover every other tab, then fetch each.
 
-        The first request (no tab) returns the page layout used to discover the
-        tab list. Every discovered tab is then fetched by its title slug and
-        merged; markets are de-duplicated by id downstream, so any overlap
-        between tabs is harmless. A failing secondary tab is logged and skipped
+        The first request uses the default tab ("popular"); its response carries
+        the page layout used to discover the remaining tabs. Each is then fetched
+        by its title slug and merged; markets are de-duplicated by id downstream,
+        so any overlap is harmless. A failing secondary tab is logged and skipped
         (partial data beats none), EXCEPT a geo-block, which aborts immediately.
         """
-        log.info("Fetching event %s (layout) from %s ...", event_id, BASE_URL)
-        first = self.fetch_tab(event_id, tab=None, dump_index=0, dump_tab="default")
-        payloads = [TabPayload("default", first)]
+        log.info("Fetching event %s (tab '%s') from %s ...", event_id, DEFAULT_TAB, BASE_URL)
+        first = self.fetch_tab(event_id, tab=DEFAULT_TAB, dump_index=0, dump_tab=DEFAULT_TAB)
+        payloads = [TabPayload(DEFAULT_TAB, first)]
 
-        _default_tab, tabs = parser.discover_tabs(first)
-        if tabs:
-            log.info("Found %d tab(s): %s", len(tabs), ", ".join(tabs))
+        _default_slug, tabs = parser.discover_tabs(first)
+        remaining = [tab for tab in tabs if tab != DEFAULT_TAB]
+        if remaining:
+            log.info("Found %d more tab(s): %s", len(remaining), ", ".join(remaining))
         else:
-            log.info("No tabs discovered; using the default response only.")
+            log.info("No additional tabs discovered.")
 
-        for index, tab in enumerate(tabs, start=1):
+        for index, tab in enumerate(remaining, start=1):
             self._sleep(random.uniform(self.config.min_delay, self.config.max_delay))
-            log.info("[%d/%d] fetching tab '%s' ...", index, len(tabs), tab)
+            log.info("[%d/%d] fetching tab '%s' ...", index, len(remaining), tab)
             try:
                 payload = self.fetch_tab(event_id, tab=tab, dump_index=index, dump_tab=tab)
             except GeoBlockedError:
@@ -188,7 +202,7 @@ class FanDuelClient:
             text = getattr(response, "text", "") or ""
             if status == 200:
                 return text
-            if status in (403, 404, 451):
+            if status in (400, 403, 404, 451):
                 # Deterministic rejections — retrying cannot help.
                 raise classify_http_error(status, text[:200])
             if status == 429:
