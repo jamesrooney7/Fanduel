@@ -5,6 +5,14 @@ browser (plain `requests` gets 403 no matter the headers), so the default
 transport is curl_cffi impersonating Chrome. The transport is injectable
 for tests, and `load_dump()` replays a --dump-raw directory with no
 network at all.
+
+Endpoint and params mirror exactly what sportsbook.fanduel.com's own web
+client sends:
+    https://api.sportsbook.fanduel.com/sbapi/event-page
+        ?_ak=...&eventId=...&tab=<title-slug>
+        &useCombinedTouchdownsVirtualMarket=true&useQuickBets=true
+Each tab is a separate request; the tab value is the lower-cased tab title
+(e.g. "Goals" -> "goals"), discovered from the layout of the first response.
 """
 
 from __future__ import annotations
@@ -30,7 +38,8 @@ from .models import TabPayload
 
 log = logging.getLogger(__name__)
 
-BASE_URL_TMPL = "https://sbapi.{state}.sportsbook.fanduel.com/api/event-page"
+BASE_URL = "https://api.sportsbook.fanduel.com/sbapi/event-page"
+API_HOST = "api.sportsbook.fanduel.com"
 
 BROWSER_HEADERS = {
     "Accept": "application/json",
@@ -47,39 +56,29 @@ RETRY_BACKOFF = (1.0, 2.0, 4.0)  # waits between the 4 total attempts
 RATE_LIMIT_BACKOFF = 10.0
 
 
-def build_params(app_key: str, event_id: int, timezone: str, tab: str | None) -> dict[str, str]:
+def build_params(app_key: str, event_id: int, tab: str | None = None) -> dict[str, str]:
     params = {
         "_ak": app_key,
         "eventId": str(event_id),
-        "betexRegion": "GBR",
-        "capiJurisdiction": "intl",
-        "currencyCode": "USD",
-        "exchangeLocale": "en_US",
-        "includePrices": "true",
-        "includeRawMarkets": "false",
-        "includeSuspended": "true",
-        "language": "en",
-        "regionCode": "NAMERICA",
-        "timezone": timezone,
+        "useCombinedTouchdownsVirtualMarket": "true",
+        "useQuickBets": "true",
     }
     if tab:
         params["tab"] = tab
     return params
 
 
-def classify_http_error(status: int, body_snippet: str, state: str) -> ScraperError:
+def classify_http_error(status: int, body_snippet: str = "") -> ScraperError:
     if status in (403, 451):
         return GeoBlockedError(
             f"FanDuel rejected the request (HTTP {status}).",
             hint=(
                 "This almost always means the request did not come from a US "
                 "residential IP in a state where FanDuel operates.\n"
-                f"- Run this tool from your home network in a legal state, and make "
-                f"sure --state (currently '{state}') matches that state.\n"
+                "- Run this tool from your home network in a state where FanDuel is legal.\n"
                 "- VPNs and cloud/datacenter IPs are blocked.\n"
-                f"- If you ARE on a residential IP in '{state}', FanDuel may have "
-                "tightened its defenses — re-run with --dump-raw dumps/ and share "
-                "the output."
+                "- If you are already on a US residential connection, FanDuel may have "
+                "tightened its defenses — re-run with --dump-raw dumps/ and share the output."
             ),
         )
     if status == 404:
@@ -122,29 +121,28 @@ class FanDuelClient:
         self._sleep = sleep
         self._transport = transport or _build_curl_cffi_transport(config)
 
-    def _base_url(self) -> str:
-        return BASE_URL_TMPL.format(state=self.config.state)
-
     def fetch_event(self, event_id: int) -> list[TabPayload]:
-        """Fetch the default tab, discover the page's tab list, fetch every tab.
+        """Fetch the layout, discover every tab, then fetch each tab's markets.
 
-        A failing secondary tab is logged and skipped (partial data beats none),
-        EXCEPT a geo-block, which is deterministic and aborts immediately.
+        The first request (no tab) returns the page layout used to discover the
+        tab list. Every discovered tab is then fetched by its title slug and
+        merged; markets are de-duplicated by id downstream, so any overlap
+        between tabs is harmless. A failing secondary tab is logged and skipped
+        (partial data beats none), EXCEPT a geo-block, which aborts immediately.
         """
-        log.info("Fetching event %s (default tab) from %s ...", event_id, self._base_url())
+        log.info("Fetching event %s (layout) from %s ...", event_id, BASE_URL)
         first = self.fetch_tab(event_id, tab=None, dump_index=0, dump_tab="default")
         payloads = [TabPayload("default", first)]
 
-        default_tab, tabs = parser.discover_tabs(first)
-        remaining = [t for t in tabs if t != default_tab]
-        if remaining:
-            log.info("Found %d additional tab(s): %s", len(remaining), ", ".join(remaining))
+        _default_tab, tabs = parser.discover_tabs(first)
+        if tabs:
+            log.info("Found %d tab(s): %s", len(tabs), ", ".join(tabs))
         else:
-            log.info("No additional tabs discovered; using the default tab only.")
+            log.info("No tabs discovered; using the default response only.")
 
-        for index, tab in enumerate(remaining, start=1):
+        for index, tab in enumerate(tabs, start=1):
             self._sleep(random.uniform(self.config.min_delay, self.config.max_delay))
-            log.info("[%d/%d] fetching tab '%s' ...", index, len(remaining), tab)
+            log.info("[%d/%d] fetching tab '%s' ...", index, len(tabs), tab)
             try:
                 payload = self.fetch_tab(event_id, tab=tab, dump_index=index, dump_tab=tab)
             except GeoBlockedError:
@@ -158,7 +156,7 @@ class FanDuelClient:
     def fetch_tab(
         self, event_id: int, tab: str | None, dump_index: int = 0, dump_tab: str = "default"
     ) -> dict:
-        params = build_params(self.config.app_key, event_id, self.config.timezone, tab)
+        params = build_params(self.config.app_key, event_id, tab)
         body = self._request_with_retries(params)
         self._maybe_dump(event_id, dump_index, dump_tab, body)
         try:
@@ -171,7 +169,6 @@ class FanDuelClient:
             ) from exc
 
     def _request_with_retries(self, params: dict) -> str:
-        url = self._base_url()
         last_error: Exception | None = None
         for attempt in range(len(RETRY_BACKOFF) + 1):
             if attempt:
@@ -179,7 +176,7 @@ class FanDuelClient:
                 log.debug("Retrying in %.1fs (attempt %d) ...", wait, attempt + 1)
                 self._sleep(wait)
             try:
-                response = self._transport(url, params, self.config.request_timeout)
+                response = self._transport(BASE_URL, params, self.config.request_timeout)
             except ScraperError:
                 raise
             except Exception as exc:  # connect errors, timeouts, TLS failures
@@ -193,7 +190,7 @@ class FanDuelClient:
                 return text
             if status in (403, 404, 451):
                 # Deterministic rejections — retrying cannot help.
-                raise classify_http_error(status, text[:200], self.config.state)
+                raise classify_http_error(status, text[:200])
             if status == 429:
                 log.warning(
                     "Rate limited (HTTP 429); waiting %.0fs before retrying.",
@@ -206,9 +203,8 @@ class FanDuelClient:
             log.debug("HTTP %s; will retry.", status)
 
         raise NetworkError(
-            f"Could not get a good response from sbapi.{self.config.state}"
-            f".sportsbook.fanduel.com after {len(RETRY_BACKOFF) + 1} attempts "
-            f"({last_error}).",
+            f"Could not get a good response from {API_HOST} after "
+            f"{len(RETRY_BACKOFF) + 1} attempts ({last_error}).",
             hint=(
                 "Check your internet connection and any firewall/VPN. Note: this "
                 "tool cannot work from cloud servers or most corporate networks — "

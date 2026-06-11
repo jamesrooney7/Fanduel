@@ -154,27 +154,60 @@ def test_extract_odds_on_empty_runner():
 
 
 class TestDiscoverTabs:
-    def test_dict_shape_ordered_by_position(self, load_fixture):
+    def test_real_shape_uses_title_slugs_in_display_order(self, load_fixture):
         default_tab, tabs = discover_tabs(load_fixture("33840322_00_default.json"))
+        # Slugs come from each tab's TITLE (not its numeric id), ordered by
+        # tabsDisplayOrder, with defaultTab (id 2 -> "Popular") identified.
         assert tabs == ["popular", "player-props", "game-props"]
-        assert default_tab is None  # fixture doesn't mark one; harmless duplicate fetch
+        assert default_tab == "popular"
 
-    def test_list_shape_with_default_flag(self):
+    def test_real_world_soccer_layout(self):
+        # Trimmed from a real FanDuel World Cup event-page response.
         payload = {
             "layout": {
-                "tabs": [
-                    {"slug": "popular", "selected": True},
-                    {"title": "Player Props"},
-                    {"name": "game-props"},
-                ]
+                "defaultTab": 2,
+                "tabsDisplayOrder": [2, 242, 183, 43, 387, 118, 72, 321, 119, 211, 120, 160, 282, 184],
+                "tabs": {
+                    "2": {"id": 2, "title": "Popular"},
+                    "43": {"id": 43, "title": "Goals"},
+                    "72": {"id": 72, "title": "Half"},
+                    "118": {"id": 118, "title": "Team Props"},
+                    "119": {"id": 119, "title": "Shots"},
+                    "120": {"id": 120, "title": "Corners"},
+                    "160": {"id": 160, "title": "Cards + Fouls"},
+                    "183": {"id": 183, "title": "Goal Scorer"},
+                    "184": {"id": 184, "title": "Penalties"},
+                    "211": {"id": 211, "title": "Assists"},
+                    "242": {"id": 242, "title": "Same Game Parlay™"},
+                    "282": {"id": 282, "title": "Saves"},
+                    "321": {"id": 321, "title": "Shots on Target"},
+                    "387": {"id": 387, "title": "Quick Bets"},
+                },
             }
         }
         default_tab, tabs = discover_tabs(payload)
         assert default_tab == "popular"
-        assert tabs == ["popular", "player-props", "game-props"]
+        assert tabs == [
+            "popular", "same-game-parlay", "goal-scorer", "goals", "quick-bets",
+            "team-props", "half", "shots-on-target", "shots", "assists",
+            "corners", "cards-fouls", "saves", "penalties",
+        ]
 
-    def test_list_of_strings(self):
-        payload = {"layout": {"tabs": ["popular", "Player Props", "popular"]}}
+    def test_tabs_missing_from_display_order_are_appended(self):
+        payload = {
+            "layout": {
+                "defaultTab": 2,
+                "tabsDisplayOrder": [2],
+                "tabs": {
+                    "2": {"title": "Popular"},
+                    "43": {"title": "Goals"},
+                },
+            }
+        }
+        assert discover_tabs(payload) == ("popular", ["popular", "goals"])
+
+    def test_list_shape_fallback(self):
+        payload = {"layout": {"tabs": ["Popular", "Player Props", "Popular"]}}
         assert discover_tabs(payload) == (None, ["popular", "player-props"])
 
     def test_unknown_shape_falls_back_to_single_tab(self):

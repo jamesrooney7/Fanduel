@@ -36,26 +36,19 @@ def make_client(transport):
 
 
 def test_build_params_default_tab():
-    params = build_params("KEY", EVENT_ID, "America/New_York", tab=None)
+    # Mirrors exactly what sportsbook.fanduel.com's web client sends.
+    params = build_params("KEY", EVENT_ID, tab=None)
     assert params == {
         "_ak": "KEY",
         "eventId": "33840322",
-        "betexRegion": "GBR",
-        "capiJurisdiction": "intl",
-        "currencyCode": "USD",
-        "exchangeLocale": "en_US",
-        "includePrices": "true",
-        "includeRawMarkets": "false",
-        "includeSuspended": "true",
-        "language": "en",
-        "regionCode": "NAMERICA",
-        "timezone": "America/New_York",
+        "useCombinedTouchdownsVirtualMarket": "true",
+        "useQuickBets": "true",
     }
 
 
 def test_build_params_with_tab():
-    params = build_params("KEY", EVENT_ID, "America/New_York", tab="player-props")
-    assert params["tab"] == "player-props"
+    params = build_params("KEY", EVENT_ID, tab="goals")
+    assert params["tab"] == "goals"
 
 
 @pytest.mark.parametrize(
@@ -68,7 +61,7 @@ def test_build_params_with_tab():
     ],
 )
 def test_classify_http_error(status, expected):
-    assert isinstance(classify_http_error(status, "", "nj"), expected)
+    assert isinstance(classify_http_error(status, ""), expected)
 
 
 def test_retries_then_success():
@@ -134,7 +127,10 @@ def _fixture_text(name: str) -> str:
 
 
 def make_tab_transport(failures: dict[str, FakeResponse] | None = None):
-    """Transport that serves fixture bodies keyed by the requested tab."""
+    """Transport that serves fixture bodies keyed by the requested tab.
+
+    The no-tab request and the 'popular' tab both return the default fixture
+    (whose layout advertises the popular/player-props/game-props tabs)."""
     bodies = {
         None: _fixture_text("33840322_00_default.json"),
         "popular": _fixture_text("33840322_00_default.json"),
@@ -159,7 +155,7 @@ def test_fetch_event_walks_all_tabs():
     transport = make_tab_transport()
     client, sleeps = make_client(transport)
     payloads = client.fetch_event(EVENT_ID)
-    # default fetch + 3 discovered tabs (no default marker -> all fetched)
+    # no-tab layout fetch + every discovered tab (including the default 'popular')
     assert [p.tab for p in payloads] == ["default", "popular", "player-props", "game-props"]
     assert transport.calls == [None, "popular", "player-props", "game-props"]
     # One polite jittered delay before each tab request.

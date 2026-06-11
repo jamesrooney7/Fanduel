@@ -76,9 +76,6 @@ Useful options:
 # Save the CSV to a specific path:
 python -m fanduel_scraper 33840322 --csv ~/Desktop/lakers-celtics.csv
 
-# Tell it which state you're in (default is nj):
-python -m fanduel_scraper 33840322 --state pa
-
 # Save the raw API responses while scraping (for debugging — see below):
 python -m fanduel_scraper 33840322 --dump-raw dumps/
 
@@ -104,7 +101,7 @@ them. Suspended markets and selections are included with their status in the
 
 | Symptom | What it means / what to do |
 |---|---|
-| **`error: FanDuel rejected the request (HTTP 403)`** | You're not on an accepted connection. Run from a **US residential** network in a **legal state**, turn off any **VPN**, and make sure `--state` matches where you are. Cloud/datacenter IPs are always blocked. |
+| **`error: FanDuel rejected the request (HTTP 403)`** | You're not on an accepted connection. Run from a **US residential** network in a **legal state** and turn off any **VPN**. Cloud/datacenter IPs are always blocked. |
 | **`error: Event ... was not found`** | The game may have ended or been removed, or the URL/ID is wrong. Open the game in your browser and copy the URL again. |
 | **`error: ... did not match the expected shape` (schema drift)** | FanDuel changed their internal API. Re-run with `--dump-raw dumps/`, then send the JSON files from `dumps/` so the parser can be updated. |
 | **Odds columns are blank for some bets** | Some selections (e.g. same-game-parlay-only markets) genuinely have no standalone price; those are included with blank odds. If *everything* is blank, it's likely schema drift — use `--dump-raw`. |

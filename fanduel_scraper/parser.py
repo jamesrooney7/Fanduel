@@ -33,61 +33,71 @@ def _slugify(text: str) -> str:
 
 
 def discover_tabs(payload: dict) -> tuple[str | None, list[str]]:
-    """Best-effort extraction of the event page's tab list.
+    """Extract the event page's tab list as query-able title slugs.
 
-    Known/plausible shapes:
-      layout.tabs = {"popular": {"title": ..., "position": 1}, ...}
-      layout.tabs = [{"slug"|"name"|"title": ..., "default"|"selected": bool}, ...]
-      layout.tabs = ["popular", "player-props", ...]
+    FanDuel's real shape: ``layout.tabs`` is a dict keyed by numeric tab id,
+    each value carrying a human ``title``; ``layout.tabsDisplayOrder`` lists the
+    ids in display order; ``layout.defaultTab`` is the id shown first. The
+    ``tab`` query parameter wants the lower-cased title slug (e.g. "Goals" ->
+    "goals"), NOT the numeric id.
 
-    Returns (default_tab_or_None, ordered unique tab slugs). Unknown shapes
-    return (None, []) so the caller falls back to single-tab mode — the run
-    still produces output.
+    Returns ``(default_tab_slug_or_None, ordered unique slugs)``. Unknown shapes
+    return ``(None, [])`` so the caller falls back to the default response only.
     """
-    tabs = dig(payload, "layout", "tabs")
-    labeled: list[tuple[str, dict]] = []
+    layout = dig(payload, "layout", default={})
+    if not isinstance(layout, dict):
+        return (None, [])
+    tabs = layout.get("tabs")
 
-    if isinstance(tabs, dict):
-        entries = [
-            (str(slug), meta if isinstance(meta, dict) else {})
-            for slug, meta in tabs.items()
-        ]
+    if isinstance(tabs, dict) and tabs:
+        order = layout.get("tabsDisplayOrder")
+        ordered_ids = (
+            [str(i) for i in order if str(i) in tabs] if isinstance(order, list) else []
+        )
+        for key in tabs:  # include any tabs missing from the display order
+            if str(key) not in ordered_ids:
+                ordered_ids.append(str(key))
 
-        def position(entry: tuple[str, dict]):
-            pos = entry[1].get("position")
-            return pos if isinstance(pos, (int, float)) else float("inf")
+        default_id = layout.get("defaultTab")
+        default_slug: str | None = None
+        slugs: list[str] = []
+        for tab_id in ordered_ids:
+            meta = tabs.get(tab_id)
+            title = meta.get("title") if isinstance(meta, dict) else None
+            slug = _slugify(str(title)) if title else _slugify(str(tab_id))
+            if not slug or slug in slugs:
+                continue
+            slugs.append(slug)
+            if default_id is not None and str(tab_id) == str(default_id):
+                default_slug = slug
+        return (default_slug, slugs)
 
-        labeled = sorted(entries, key=position)
-    elif isinstance(tabs, list):
+    # Robustness: tolerate a plain list of tab names or objects.
+    if isinstance(tabs, list):
+        slugs = []
         for item in tabs:
             if isinstance(item, str):
-                labeled.append((item, {}))
+                label = item
             elif isinstance(item, dict):
-                label = item.get("slug") or item.get("name") or item.get("title")
-                if label:
-                    labeled.append((str(label), item))
-    else:
-        if tabs is not None:
-            log.warning(
-                "Unrecognized layout.tabs shape (%s); scraping the default tab only.",
-                type(tabs).__name__,
-            )
-        return (None, [])
+                label = (
+                    item.get("title")
+                    or item.get("name")
+                    or item.get("slug")
+                    or item.get("id")
+                )
+            else:
+                continue
+            slug = _slugify(str(label)) if label is not None else ""
+            if slug and slug not in slugs:
+                slugs.append(slug)
+        return (None, slugs)
 
-    default_tab: str | None = None
-    slugs: list[str] = []
-    for label, meta in labeled:
-        slug = _slugify(label)
-        if not slug or slug in slugs:
-            continue
-        slugs.append(slug)
-        if meta.get("default") is True or meta.get("selected") is True:
-            default_tab = slug
-    if not slugs:
+    if tabs is not None:
         log.warning(
-            "No tabs discovered in the response layout; scraping the default tab only."
+            "Unrecognized layout.tabs shape (%s); using the default response only.",
+            type(tabs).__name__,
         )
-    return (default_tab, slugs)
+    return (None, [])
 
 
 def parse_event_info(payload: dict, event_id: int) -> EventInfo:

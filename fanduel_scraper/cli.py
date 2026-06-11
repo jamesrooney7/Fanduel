@@ -31,7 +31,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--state",
         default=None,
-        help="FanDuel state subdomain you are in (default: nj; e.g. nj, pa, mi, il, co, az, ny)",
+        help="(deprecated, ignored) the API endpoint is no longer state-specific",
     )
     p.add_argument(
         "--spreadsheet",

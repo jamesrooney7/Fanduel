@@ -1,9 +1,11 @@
 {
   "layout": {
+    "defaultTab": 2,
+    "tabsDisplayOrder": [2, 50, 80],
     "tabs": {
-      "popular": {"title": "Popular", "position": 1},
-      "player-props": {"title": "Player Props", "position": 2},
-      "game-props": {"title": "Game Props", "position": 3}
+      "2": {"id": 2, "title": "Popular", "cards": [{"id": 2}], "isSameGameMulti": false},
+      "50": {"id": 50, "title": "Player Props", "cards": [{"id": 50}], "isSameGameMulti": false},
+      "80": {"id": 80, "title": "Game Props", "cards": [{"id": 80}], "isSameGameMulti": false}
     }
   },
   "attachments": {
