@@ -95,21 +95,6 @@ def _event_id_param(url: str) -> int | None:
         return None
 
 
-def _strip_cache_headers(route) -> None:
-    """Route handler: resend the request without conditional-cache headers so the
-    server returns a fresh 200 with a body instead of an empty 304."""
-    try:
-        headers = {
-            k: v for k, v in route.request.headers.items() if k.lower() not in _CACHE_HEADERS
-        }
-        route.continue_(headers=headers)
-    except Exception:  # noqa: BLE001 - never let routing break the page load
-        try:
-            route.continue_()
-        except Exception:  # noqa: BLE001
-            pass
-
-
 def replayable_headers(headers: dict | None) -> dict:
     """Keep the headers the app added that fetch() will actually let us set
     (notably authorization / x-* tokens); drop browser-managed ones."""
@@ -181,11 +166,13 @@ class BrowserFetcher:
         context = self._launch_context(pw, headed)
         try:
             context.add_init_script(_STEALTH_JS)
-            # Force a full 200 (not a cached 304 with an empty body) for the
-            # markets API by dropping conditional-request headers.
-            context.route(f"**{EVENT_PAGE_PATH}**", _strip_cache_headers)
             page = context.pages[0] if context.pages else context.new_page()
             page.set_default_timeout(self._timeout_ms())
+            # A saved profile keeps the markets cached, so the browser may answer
+            # from disk (no request) or send a conditional GET (empty 304).
+            # Disable the HTTP cache so the request actually hits the network and
+            # returns a full 200 body we can read.
+            self._disable_cache(context, page)
 
             responses: list = []
             req_headers: dict = {}
@@ -209,6 +196,7 @@ class BrowserFetcher:
 
             self._open(page)
             harvested = self._wait_for_data(responses, event_id, headed)
+            self._log_seen(responses)
 
             if self.config.dump_raw_dir:
                 self._save_page_snapshot(page)
@@ -227,6 +215,31 @@ class BrowserFetcher:
             return self._collect(page, event_id, harvested, replay)
         finally:
             context.close()
+
+    def _disable_cache(self, context, page) -> None:
+        try:
+            cdp = context.new_cdp_session(page)
+            cdp.send("Network.enable")
+            cdp.send("Network.clearBrowserCache")
+            cdp.send("Network.setCacheDisabled", {"cacheDisabled": True})
+            log.debug("Disabled browser HTTP cache via CDP.")
+        except Exception as exc:  # noqa: BLE001
+            log.debug("Could not disable cache via CDP (%s); continuing.", exc)
+
+    def _log_seen(self, responses) -> None:
+        """Always report what the page actually requested — turns a failed run
+        into a real signal instead of a guess."""
+        if not responses:
+            log.warning(
+                "Saw no %s requests at all — the page may not have made its market "
+                "call (challenge not cleared, or wrong/finished game).",
+                EVENT_PAGE_PATH,
+            )
+            return
+        summary = ", ".join(
+            f"{_tab_param(r.url) or '?'}={getattr(r, 'status', '?')}" for r in responses[:15]
+        )
+        log.info("Observed %d event-page response(s): %s", len(responses), summary)
 
     def _launch_context(self, pw, headed: bool):
         # A persistent profile means a solved "press & hold" challenge stays

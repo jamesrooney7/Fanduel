@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from fanduel_scraper.browser import BrowserFetcher, _strip_cache_headers, replayable_headers
+from fanduel_scraper.browser import BrowserFetcher, replayable_headers
 from fanduel_scraper.config import Config
 from fanduel_scraper.errors import GeoBlockedError
 
@@ -68,25 +68,6 @@ def test_replayable_headers_filters_and_keeps():
     assert "user-agent" not in out
     assert "sec-fetch-mode" not in out
     assert "origin" not in out
-
-
-class FakeRoute:
-    def __init__(self, headers):
-        self.request = type("Req", (), {"headers": headers})()
-        self.continued_with = None
-
-    def continue_(self, headers=None):
-        self.continued_with = headers
-
-
-def test_strip_cache_headers_removes_conditional():
-    route = FakeRoute(
-        {"accept": "application/json", "if-none-match": 'W/"abc"', "x-px-context": "tok"}
-    )
-    _strip_cache_headers(route)
-    assert "if-none-match" not in route.continued_with
-    assert route.continued_with["accept"] == "application/json"
-    assert route.continued_with["x-px-context"] == "tok"
 
 
 class FakeResponse:
