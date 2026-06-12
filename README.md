@@ -106,7 +106,8 @@ them. Suspended markets and selections are included with their status in the
 
 | Symptom | What it means / what to do |
 |---|---|
-| **`error: Could not launch headless Chromium` / `Playwright is not installed`** | Run the one-time browser install: `python -m playwright install chromium` (after `pip install -r requirements.txt`). If the bare `playwright` command says "command not found", use the `python -m playwright` form. |
+| **`error: Could not launch ... browser` / `Playwright is not installed`** | Run the one-time browser install: `python -m playwright install chromium` (after `pip install -r requirements.txt`). If the bare `playwright` command says "command not found", use the `python -m playwright` form. |
+| **Browser opens but every tab fails / `Could not fetch tab ...`** | FanDuel may be challenging the headless browser. Re-run with `--headed` (shows the window — most reliable), and add `--dump-raw dumps/ -v` to save `dumps/page.png` showing what the browser actually saw (a login wall, state picker, or bot challenge). |
 | **`error: FanDuel rejected the ... request (HTTP 403)`** | You're not on an accepted connection. Run from a **US residential** network in a **legal state** and turn off any **VPN**. Cloud/datacenter IPs are always blocked. |
 | **`error: Event ... was not found`** | The game may have ended or been removed, or the URL/ID is wrong. Open the game in your browser and copy the URL again. |
 | **`error: ... did not match the expected shape` (schema drift)** | FanDuel changed their internal API. Re-run with `--dump-raw dumps/`, then send the JSON files from `dumps/` so the parser can be updated. |

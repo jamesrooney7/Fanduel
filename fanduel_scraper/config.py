@@ -25,6 +25,7 @@ class Config:
     from_dump_dir: Path | None = None
     csv_path: Path | None = None
     use_http: bool = False
+    headed: bool = False
     verbose: bool = False
 
 
@@ -54,5 +55,6 @@ def load_config(args) -> Config:
         from_dump_dir=Path(args.from_dump) if args.from_dump else None,
         csv_path=Path(args.csv) if args.csv else None,
         use_http=bool(getattr(args, "http", False)),
+        headed=bool(getattr(args, "headed", False)),
         verbose=bool(args.verbose),
     )

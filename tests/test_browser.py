@@ -18,6 +18,10 @@ def _fixture_text(name: str) -> str:
     return (FIXTURE_DIR / name).read_text(encoding="utf-8")
 
 
+def _tab_of(url: str):
+    return parse_qs(urlparse(url).query).get("tab", [None])[0]
+
+
 class FakePage:
     """Stands in for a Playwright page: .evaluate() returns canned tab bodies."""
 
@@ -30,12 +34,34 @@ class FakePage:
         self.failures = failures or {}
         self.calls: list[str] = []
 
-    def evaluate(self, _js, url):
-        tab = parse_qs(urlparse(url).query).get("tab", [None])[0]
+    def evaluate(self, _js, arg):
+        tab = _tab_of(arg["url"])
         self.calls.append(tab)
         if tab in self.failures:
             return {"status": self.failures[tab], "body": ""}
         return {"status": 200, "body": self.bodies[tab]}
+
+
+class NavigationOnlyPage(FakePage):
+    """In-page fetch always fails (CORS-style HTTP 0); only navigation works."""
+
+    def evaluate(self, _js, arg):
+        self.calls.append(_tab_of(arg["url"]))
+        return {"status": 0, "body": "fetch error: TypeError: Failed to fetch"}
+
+    class _Resp:
+        def __init__(self, status, body):
+            self.status = status
+            self._body = body
+
+        def text(self):
+            return self._body
+
+    def goto(self, url, **_kwargs):
+        tab = _tab_of(url)
+        if tab in self.failures:
+            return self._Resp(self.failures[tab], "")
+        return self._Resp(200, self.bodies[tab])
 
 
 def make_fetcher(**config_kwargs):
@@ -63,6 +89,15 @@ def test_collect_aborts_on_geo_block():
     page = FakePage(failures={"player-props": 403})
     with pytest.raises(GeoBlockedError):
         fetcher._collect(page, EVENT_ID)
+
+
+def test_falls_back_to_navigation_when_fetch_blocked():
+    # Simulates the real-world CORS failure: in-page fetch() returns HTTP 0,
+    # so the fetcher must fall back to navigating to the API URL.
+    fetcher = make_fetcher()
+    page = NavigationOnlyPage()
+    payloads = fetcher._collect(page, EVENT_ID)
+    assert [p.tab for p in payloads] == ["popular", "player-props", "game-props"]
 
 
 def test_collect_produces_parseable_payloads():

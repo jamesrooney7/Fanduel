@@ -66,7 +66,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--dump-raw",
         default=None,
         metavar="DIR",
-        help="save every raw FanDuel response into DIR (for debugging)",
+        help="save every raw FanDuel response (and a page screenshot) into DIR for debugging",
+    )
+    p.add_argument(
+        "--headed",
+        action="store_true",
+        help="show the browser window while scraping (helps if a headless run gets blocked)",
     )
     p.add_argument(
         "--csv",
