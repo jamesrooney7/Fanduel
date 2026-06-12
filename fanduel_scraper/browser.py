@@ -128,71 +128,89 @@ class BrowserFetcher:
                 ),
             ) from exc
 
-        log.info("Launching %s browser ...", "visible" if self.config.headed else "headless")
+        # Headless browsers are more likely to be fingerprinted and served a
+        # stripped page that never makes the market request, so if a headless
+        # run captures nothing, fall back to a visible window automatically.
+        modes = [True] if self.config.headed else [False, True]
         with sync_playwright() as pw:
-            browser = self._launch(pw)
-            try:
-                context = browser.new_context(
-                    locale="en-US",
-                    user_agent=api.BROWSER_HEADERS["User-Agent"],
-                    viewport={"width": 1366, "height": 900},
-                )
-                context.add_init_script(_STEALTH_JS)
-                page = context.new_page()
-                page.set_default_timeout(self._timeout_ms())
-
-                responses = []
-                req_headers: dict = {}
-
-                def on_response(resp):
-                    try:
-                        if EVENT_PAGE_PATH in resp.url:
-                            responses.append(resp)
-                    except Exception:  # noqa: BLE001
-                        pass
-
-                def on_request(req):
-                    try:
-                        if EVENT_PAGE_PATH in req.url and not req_headers:
-                            req_headers.update(req.all_headers())
-                    except Exception:  # noqa: BLE001
-                        pass
-
-                page.on("response", on_response)
-                page.on("request", on_request)
-
-                self._open(page)
-                harvested = self._read_responses(responses, event_id)
-
-                if self.config.dump_raw_dir and req_headers:
-                    self._dump_headers(req_headers)
-
-                if not harvested:
-                    self._save_page_snapshot(page)
-                    raise NetworkError(
-                        f"The page loaded but no market data for event {event_id} was "
-                        "captured from it.",
-                        hint=(
-                            "Most likely the game has finished or hasn't opened for "
-                            "betting yet (a finished game's URL redirects away). "
-                            "Double-check the game is live/upcoming on FanDuel.\n"
-                            "If it is, re-run with --headed --dump-raw dumps/ and look "
-                            "at dumps/page.png to see what the browser showed."
-                        ),
+            for attempt, headed in enumerate(modes):
+                is_last = attempt == len(modes) - 1
+                result = self._attempt(pw, event_id, headed, is_last)
+                if result is not None:
+                    return result
+                if not is_last:
+                    log.warning(
+                        "Headless run captured no data; retrying with a visible "
+                        "browser window ..."
                     )
+        raise NetworkError(
+            f"The page loaded but no market data for event {event_id} was captured.",
+            hint=(
+                "Most likely the game has finished or hasn't opened for betting yet "
+                "(a finished game's URL redirects away). Double-check the game is "
+                "live/upcoming on FanDuel.\n"
+                "If it is, re-run with --dump-raw dumps/ and look at dumps/page.png "
+                "to see what the browser showed."
+            ),
+        )
 
-                replay = replayable_headers(req_headers)
-                log.info(
-                    "Captured the app's own market request; replaying %d header(s) "
-                    "for the remaining tabs.",
-                    len(replay),
-                )
-                return self._collect(page, event_id, harvested, replay)
-            finally:
-                browser.close()
+    def _attempt(self, pw, event_id: int, headed: bool, is_last: bool):
+        """One launch+open+harvest; returns payloads, or None if nothing captured."""
+        log.info("Launching %s browser ...", "visible" if headed else "headless")
+        browser = self._launch(pw, headed)
+        try:
+            context = browser.new_context(
+                locale="en-US",
+                user_agent=api.BROWSER_HEADERS["User-Agent"],
+                viewport={"width": 1366, "height": 900},
+            )
+            context.add_init_script(_STEALTH_JS)
+            page = context.new_page()
+            page.set_default_timeout(self._timeout_ms())
 
-    def _launch(self, pw):
-        headless = not self.config.headed
+            responses = []
+            req_headers: dict = {}
+
+            def on_response(resp):
+                try:
+                    if EVENT_PAGE_PATH in resp.url:
+                        responses.append(resp)
+                except Exception:  # noqa: BLE001
+                    pass
+
+            def on_request(req):
+                try:
+                    if EVENT_PAGE_PATH in req.url and not req_headers:
+                        req_headers.update(req.all_headers())
+                except Exception:  # noqa: BLE001
+                    pass
+
+            page.on("response", on_response)
+            page.on("request", on_request)
+
+            self._open(page)
+            if self.config.dump_raw_dir:
+                self._save_page_snapshot(page)
+            harvested = self._read_responses(responses, event_id)
+
+            if self.config.dump_raw_dir and req_headers:
+                self._dump_headers(req_headers)
+
+            if not harvested:
+                return None
+
+            replay = replayable_headers(req_headers)
+            log.info(
+                "Captured the app's own market request; replaying %d header(s) "
+                "for the remaining tabs.",
+                len(replay),
+            )
+            return self._collect(page, event_id, harvested, replay)
+        finally:
+            browser.close()
+
+    def _launch(self, pw, headed: bool):
+        headless = not headed
         args = ["--disable-blink-features=AutomationControlled"]
         errors = []
         for channel in ("chrome", None):  # real Chrome first (least detectable)
@@ -223,8 +241,7 @@ class BrowserFetcher:
         except Exception:  # noqa: BLE001
             pass
         self._sleep(2.0)
-        if self.config.dump_raw_dir:
-            self._save_page_snapshot(page)
+        log.info("Browser session ready.")
         log.info("Browser session ready.")
 
     def _read_responses(self, responses, event_id: int) -> dict[str, str]:
