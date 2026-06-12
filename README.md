@@ -104,6 +104,7 @@ them. Suspended markets and selections are included with their status in the
 | **`error: FanDuel rejected the request (HTTP 403)`** | You're not on an accepted connection. Run from a **US residential** network in a **legal state** and turn off any **VPN**. Cloud/datacenter IPs are always blocked. |
 | **`error: Event ... was not found`** | The game may have ended or been removed, or the URL/ID is wrong. Open the game in your browser and copy the URL again. |
 | **`error: ... did not match the expected shape` (schema drift)** | FanDuel changed their internal API. Re-run with `--dump-raw dumps/`, then send the JSON files from `dumps/` so the parser can be updated. |
+| **`error: FanDuel rejected the starting tab '...' (HTTP 400)`** | The first tab it tries (`popular`) isn't valid for this sport. Open the event in your browser → DevTools → Network → filter `event-page` → click any tab → read the `tab=` value in that request's URL, then re-run with `--default-tab <that-value>`. |
 | **Odds columns are blank for some bets** | Some selections (e.g. same-game-parlay-only markets) genuinely have no standalone price; those are included with blank odds. If *everything* is blank, it's likely schema drift — use `--dump-raw`. |
 | **FanDuel changed its public key** | Set `FANDUEL_APP_KEY` (see `.env.example`) to the new value (find it in the network requests on sportsbook.fanduel.com). |
 

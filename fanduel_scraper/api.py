@@ -55,11 +55,6 @@ BROWSER_HEADERS = {
 RETRY_BACKOFF = (1.0, 2.0, 4.0)  # waits between the 4 total attempts
 RATE_LIMIT_BACKOFF = 10.0
 
-# The endpoint requires a tab; "Popular" is FanDuel's standard default tab and
-# every event-page response carries the full layout, so we bootstrap with it to
-# discover the rest of the tabs.
-DEFAULT_TAB = "popular"
-
 
 def build_params(app_key: str, event_id: int, tab: str | None = None) -> dict[str, str]:
     params = {
@@ -137,18 +132,32 @@ class FanDuelClient:
     def fetch_event(self, event_id: int) -> list[TabPayload]:
         """Fetch the default tab, discover every other tab, then fetch each.
 
-        The first request uses the default tab ("popular"); its response carries
-        the page layout used to discover the remaining tabs. Each is then fetched
-        by its title slug and merged; markets are de-duplicated by id downstream,
-        so any overlap is harmless. A failing secondary tab is logged and skipped
-        (partial data beats none), EXCEPT a geo-block, which aborts immediately.
+        The first request uses the default tab (configurable, default "popular");
+        its response carries the page layout used to discover the remaining tabs.
+        Each is then fetched by its title slug and merged; markets are
+        de-duplicated by id downstream, so any overlap is harmless. A failing
+        secondary tab is logged and skipped (partial data beats none), EXCEPT a
+        geo-block, which aborts immediately.
         """
-        log.info("Fetching event %s (tab '%s') from %s ...", event_id, DEFAULT_TAB, BASE_URL)
-        first = self.fetch_tab(event_id, tab=DEFAULT_TAB, dump_index=0, dump_tab=DEFAULT_TAB)
-        payloads = [TabPayload(DEFAULT_TAB, first)]
+        default_tab = self.config.default_tab
+        log.info("Fetching event %s (tab '%s') from %s ...", event_id, default_tab, BASE_URL)
+        try:
+            first = self.fetch_tab(event_id, tab=default_tab, dump_index=0, dump_tab=default_tab)
+        except SchemaDriftError as exc:
+            raise SchemaDriftError(
+                f"FanDuel rejected the starting tab '{default_tab}' (HTTP 400) — the "
+                "default tab for this event is named something else.",
+                hint=(
+                    "Find a valid tab: open the event in your browser, open DevTools -> "
+                    "Network, filter 'event-page', click any tab on the page, and read the "
+                    "'tab=' value in that request's URL. Then re-run with "
+                    "--default-tab <that-value>."
+                ),
+            ) from exc
+        payloads = [TabPayload(default_tab, first)]
 
         _default_slug, tabs = parser.discover_tabs(first)
-        remaining = [tab for tab in tabs if tab != DEFAULT_TAB]
+        remaining = [tab for tab in tabs if tab != default_tab]
         if remaining:
             log.info("Found %d more tab(s): %s", len(remaining), ", ".join(remaining))
         else:

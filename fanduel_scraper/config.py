@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_APP_KEY = "FhMFpcPWXMeyZxOx"  # public key embedded in FanDuel's web client
+DEFAULT_TAB = "popular"  # tab fetched first to obtain the layout / tab list
 
 
 @dataclass(frozen=True)
 class Config:
     state: str = "nj"
     app_key: str = DEFAULT_APP_KEY
+    default_tab: str = DEFAULT_TAB
     timezone: str = "America/New_York"
     service_account_file: Path = Path("service_account.json")
     spreadsheet: str | None = None
@@ -41,6 +43,7 @@ def load_config(args) -> Config:
     return Config(
         state=str(pick(args.state, "FANDUEL_STATE", "nj")).strip().lower(),
         app_key=str(pick(None, "FANDUEL_APP_KEY", DEFAULT_APP_KEY)),
+        default_tab=str(pick(args.default_tab, "FANDUEL_DEFAULT_TAB", DEFAULT_TAB)).strip(),
         timezone=str(pick(args.timezone, "FANDUEL_TIMEZONE", "America/New_York")),
         service_account_file=Path(
             pick(args.service_account, "GOOGLE_SERVICE_ACCOUNT_FILE", "service_account.json")

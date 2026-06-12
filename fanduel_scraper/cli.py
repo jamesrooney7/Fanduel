@@ -34,6 +34,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="(deprecated, ignored) the API endpoint is no longer state-specific",
     )
     p.add_argument(
+        "--default-tab",
+        default=None,
+        metavar="TAB",
+        help=(
+            "tab fetched first to discover the rest (default: popular). Set this if "
+            "the run fails because the default tab is named something else for a sport."
+        ),
+    )
+    p.add_argument(
         "--spreadsheet",
         default=None,
         metavar="ID_OR_URL",
