@@ -68,6 +68,28 @@ def test_replayable_headers_filters_and_keeps():
     assert "origin" not in out
 
 
+class FakeResponse:
+    def __init__(self, url, status, body):
+        self.url = url
+        self.status = status
+        self._body = body
+
+    def text(self):
+        return self._body
+
+
+def test_read_responses_keeps_only_target_event():
+    api_base = "https://api.sportsbook.fanduel.com/sbapi/event-page"
+    responses = [
+        FakeResponse(f"{api_base}?eventId=999&tab=popular", 200, '{"other": true}'),
+        FakeResponse(f"{api_base}?eventId={EVENT_ID}&tab=popular", 200, BODIES["popular"]),
+        FakeResponse(f"{api_base}?eventId={EVENT_ID}&tab=goals", 500, ""),  # non-200 ignored
+    ]
+    harvested = make_fetcher()._read_responses(responses, EVENT_ID)
+    assert set(harvested) == {"popular"}
+    assert harvested["popular"] == BODIES["popular"]
+
+
 def test_collect_replays_remaining_tabs():
     # Only the default tab was harvested from the app; the rest are replayed.
     fetcher = make_fetcher()

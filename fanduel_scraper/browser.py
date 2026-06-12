@@ -81,6 +81,14 @@ def _tab_param(url: str) -> str | None:
     return parse_qs(urlparse(url).query).get("tab", [None])[0]
 
 
+def _event_id_param(url: str) -> int | None:
+    raw = parse_qs(urlparse(url).query).get("eventId", [None])[0]
+    try:
+        return int(raw) if raw is not None else None
+    except ValueError:
+        return None
+
+
 def replayable_headers(headers: dict | None) -> dict:
     """Keep the headers the app added that fetch() will actually let us set
     (notably authorization / x-* tokens); drop browser-managed ones."""
@@ -154,7 +162,7 @@ class BrowserFetcher:
                 page.on("request", on_request)
 
                 self._open(page)
-                harvested = self._read_responses(responses)
+                harvested = self._read_responses(responses, event_id)
 
                 if self.config.dump_raw_dir and req_headers:
                     self._dump_headers(req_headers)
@@ -162,12 +170,14 @@ class BrowserFetcher:
                 if not harvested:
                     self._save_page_snapshot(page)
                     raise NetworkError(
-                        "The page loaded but no market data was captured from it.",
+                        f"The page loaded but no market data for event {event_id} was "
+                        "captured from it.",
                         hint=(
-                            "FanDuel may be showing a login/age wall, a state picker, "
-                            "or a bot challenge instead of the game.\n"
-                            "Re-run with --headed --dump-raw dumps/ and look at "
-                            "dumps/page.png to see what the browser actually showed."
+                            "Most likely the game has finished or hasn't opened for "
+                            "betting yet (a finished game's URL redirects away). "
+                            "Double-check the game is live/upcoming on FanDuel.\n"
+                            "If it is, re-run with --headed --dump-raw dumps/ and look "
+                            "at dumps/page.png to see what the browser showed."
                         ),
                     )
 
@@ -217,12 +227,16 @@ class BrowserFetcher:
             self._save_page_snapshot(page)
         log.info("Browser session ready.")
 
-    def _read_responses(self, responses) -> dict[str, str]:
-        """Pull JSON bodies out of the event-page responses the app made."""
+    def _read_responses(self, responses, event_id: int) -> dict[str, str]:
+        """Pull JSON bodies out of the event-page responses the app made, keeping
+        only those for the event we asked for (a redirected page can fetch other
+        events' data)."""
         harvested: dict[str, str] = {}
         for resp in responses:
             try:
                 if getattr(resp, "status", 0) != 200:
+                    continue
+                if _event_id_param(resp.url) != event_id:
                     continue
                 body = resp.text()
             except Exception:  # noqa: BLE001
