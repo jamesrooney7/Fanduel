@@ -26,6 +26,8 @@ class Config:
     csv_path: Path | None = None
     use_http: bool = False
     headed: bool = False
+    solve_timeout: float = 180.0
+    profile_dir: Path | None = None
     verbose: bool = False
 
 

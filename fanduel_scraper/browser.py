@@ -24,6 +24,7 @@ import json
 import logging
 import random
 import time
+from pathlib import Path
 from typing import Callable
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -157,18 +158,13 @@ class BrowserFetcher:
     def _attempt(self, pw, event_id: int, headed: bool, is_last: bool):
         """One launch+open+harvest; returns payloads, or None if nothing captured."""
         log.info("Launching %s browser ...", "visible" if headed else "headless")
-        browser = self._launch(pw, headed)
+        context = self._launch_context(pw, headed)
         try:
-            context = browser.new_context(
-                locale="en-US",
-                user_agent=api.BROWSER_HEADERS["User-Agent"],
-                viewport={"width": 1366, "height": 900},
-            )
             context.add_init_script(_STEALTH_JS)
-            page = context.new_page()
+            page = context.pages[0] if context.pages else context.new_page()
             page.set_default_timeout(self._timeout_ms())
 
-            responses = []
+            responses: list = []
             req_headers: dict = {}
 
             def on_response(resp):
@@ -189,12 +185,12 @@ class BrowserFetcher:
             page.on("request", on_request)
 
             self._open(page)
+            harvested = self._wait_for_data(responses, event_id, headed)
+
             if self.config.dump_raw_dir:
                 self._save_page_snapshot(page)
-            harvested = self._read_responses(responses, event_id)
-
-            if self.config.dump_raw_dir and req_headers:
-                self._dump_headers(req_headers)
+                if req_headers:
+                    self._dump_headers(req_headers)
 
             if not harvested:
                 return None
@@ -207,18 +203,29 @@ class BrowserFetcher:
             )
             return self._collect(page, event_id, harvested, replay)
         finally:
-            browser.close()
+            context.close()
 
-    def _launch(self, pw, headed: bool):
-        headless = not headed
-        args = ["--disable-blink-features=AutomationControlled"]
+    def _launch_context(self, pw, headed: bool):
+        # A persistent profile means a solved "press & hold" challenge stays
+        # solved across runs (the bot cookie is reused), so you rarely see it
+        # more than once.
+        profile = self._profile_dir()
+        profile.mkdir(parents=True, exist_ok=True)
+        common = {
+            "user_data_dir": str(profile),
+            "headless": not headed,
+            "args": ["--disable-blink-features=AutomationControlled"],
+            "locale": "en-US",
+            "user_agent": api.BROWSER_HEADERS["User-Agent"],
+            "viewport": {"width": 1366, "height": 900},
+        }
         errors = []
         for channel in ("chrome", None):  # real Chrome first (least detectable)
             try:
-                kwargs = {"headless": headless, "args": args}
+                kwargs = dict(common)
                 if channel:
                     kwargs["channel"] = channel
-                return pw.chromium.launch(**kwargs)
+                return pw.chromium.launch_persistent_context(**kwargs)
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"{channel or 'bundled chromium'}: {exc}")
         raise ScraperError(
@@ -229,6 +236,9 @@ class BrowserFetcher:
                 "(or install Google Chrome on this machine)."
             ),
         )
+
+    def _profile_dir(self) -> Path:
+        return self.config.profile_dir or (Path.home() / ".fanduel_scraper" / "chrome-profile")
 
     def _open(self, page) -> None:
         log.info("Opening %s ...", self.navigate_url)
@@ -241,8 +251,29 @@ class BrowserFetcher:
         except Exception:  # noqa: BLE001
             pass
         self._sleep(2.0)
-        log.info("Browser session ready.")
-        log.info("Browser session ready.")
+
+    def _wait_for_data(self, responses, event_id: int, headed: bool) -> dict[str, str]:
+        """Poll until the app fetches this event's markets. In a visible window
+        this gives you time to solve a 'press & hold' / 'verify you're human'
+        challenge by hand — once solved, the page loads and we capture it."""
+        harvested = self._read_responses(responses, event_id)
+        if harvested or self.config.solve_timeout <= 0:
+            return harvested
+        if headed:
+            log.warning(
+                "No market data yet. If the browser window shows a 'press & hold' or "
+                "'verify you are human' challenge, solve it now — scraping continues "
+                "automatically once the page loads (waiting up to %d seconds).",
+                int(self.config.solve_timeout),
+            )
+        deadline = time.monotonic() + (self.config.solve_timeout if headed else 12.0)
+        while time.monotonic() < deadline:
+            self._sleep(1.5)
+            harvested = self._read_responses(responses, event_id)
+            if harvested:
+                log.info("Market data captured.")
+                return harvested
+        return {}
 
     def _read_responses(self, responses, event_id: int) -> dict[str, str]:
         """Pull JSON bodies out of the event-page responses the app made, keeping
