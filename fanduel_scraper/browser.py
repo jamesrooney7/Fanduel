@@ -59,6 +59,11 @@ async ({url, headers}) => {
 
 _STEALTH_JS = "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
 
+# Conditional-request headers that let the server answer 304 Not Modified with
+# an empty body (the page renders from cache, but we capture nothing). We strip
+# these everywhere so every request returns a fresh 200 with the full body.
+_CACHE_HEADERS = {"if-none-match", "if-modified-since"}
+
 # Headers a browser manages itself; fetch() silently ignores attempts to set
 # them, so there's no point replaying them.
 _FORBIDDEN_HEADERS = {
@@ -66,7 +71,7 @@ _FORBIDDEN_HEADERS = {
     "cookie", "accept-encoding", "accept-charset", "te", "trailer",
     "transfer-encoding", "upgrade", "via", "date", "dnt", "keep-alive", "expect",
     "content-type",
-}
+} | _CACHE_HEADERS
 _FORBIDDEN_PREFIXES = ("sec-", "proxy-", ":")
 
 
@@ -88,6 +93,21 @@ def _event_id_param(url: str) -> int | None:
         return int(raw) if raw is not None else None
     except ValueError:
         return None
+
+
+def _strip_cache_headers(route) -> None:
+    """Route handler: resend the request without conditional-cache headers so the
+    server returns a fresh 200 with a body instead of an empty 304."""
+    try:
+        headers = {
+            k: v for k, v in route.request.headers.items() if k.lower() not in _CACHE_HEADERS
+        }
+        route.continue_(headers=headers)
+    except Exception:  # noqa: BLE001 - never let routing break the page load
+        try:
+            route.continue_()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def replayable_headers(headers: dict | None) -> dict:
@@ -161,6 +181,9 @@ class BrowserFetcher:
         context = self._launch_context(pw, headed)
         try:
             context.add_init_script(_STEALTH_JS)
+            # Force a full 200 (not a cached 304 with an empty body) for the
+            # markets API by dropping conditional-request headers.
+            context.route(f"**{EVENT_PAGE_PATH}**", _strip_cache_headers)
             page = context.pages[0] if context.pages else context.new_page()
             page.set_default_timeout(self._timeout_ms())
 
