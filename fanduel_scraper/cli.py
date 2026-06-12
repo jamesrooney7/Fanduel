@@ -76,8 +76,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     p.add_argument("--version", action="version", version=f"fanduel_scraper {__version__}")
-    # Debugging escape hatch (hidden from --help):
+    # Debugging escape hatches (hidden from --help):
     p.add_argument("--from-dump", default=None, metavar="DIR", help=argparse.SUPPRESS)
+    p.add_argument("--http", action="store_true", help=argparse.SUPPRESS)  # legacy raw-HTTP path
     return p
 
 
@@ -110,9 +111,14 @@ def _run(event_ref: str, config: Config) -> int:
 
     if config.from_dump_dir:
         tab_payloads = api.load_dump(config.from_dump_dir, event_id)
+    elif config.use_http:
+        tab_payloads = api.FanDuelClient(config).fetch_event(event_id)
     else:
-        client = api.FanDuelClient(config)
-        tab_payloads = client.fetch_event(event_id)
+        from .browser import FALLBACK_URL, BrowserFetcher
+
+        ref = event_ref.strip()
+        navigate_url = ref if ref.lower().startswith("http") else FALLBACK_URL
+        tab_payloads = BrowserFetcher(config, navigate_url).fetch_event(event_id)
 
     result = parse_event(
         tab_payloads, event_id, scrape_time.strftime("%Y-%m-%dT%H:%M:%SZ")

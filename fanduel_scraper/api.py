@@ -236,17 +236,22 @@ class FanDuelClient:
         )
 
     def _maybe_dump(self, event_id: int, index: int, tab: str, body_text: str) -> None:
-        dump_dir = self.config.dump_raw_dir
-        if not dump_dir:
-            return
-        dump_dir.mkdir(parents=True, exist_ok=True)
-        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", tab) or "default"
-        path = dump_dir / f"{event_id}_{index:02d}_{slug}.json"
-        path.write_text(body_text, encoding="utf-8")
-        log.debug("Dumped raw response to %s", path)
+        if self.config.dump_raw_dir:
+            path = write_dump(self.config.dump_raw_dir, event_id, index, tab, body_text)
+            log.debug("Dumped raw response to %s", path)
 
 
 DUMP_FILE_RE = re.compile(r"^(?P<event>\d+)_(?P<index>\d+)_(?P<tab>.+)\.json$")
+
+
+def write_dump(dump_dir: Path, event_id: int, index: int, tab: str, body_text: str) -> Path:
+    """Save a raw response body as ``{event}_{index:02d}_{tab}.json`` (the format
+    ``load_dump`` replays). Shared by the HTTP and browser fetchers."""
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", tab) or "default"
+    path = dump_dir / f"{event_id}_{index:02d}_{slug}.json"
+    path.write_text(body_text, encoding="utf-8")
+    return path
 
 
 def load_dump(dump_dir: Path, event_id: int | None = None) -> list[TabPayload]:

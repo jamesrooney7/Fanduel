@@ -63,6 +63,10 @@ def discover_tabs(payload: dict) -> tuple[str | None, list[str]]:
         slugs: list[str] = []
         for tab_id in ordered_ids:
             meta = tabs.get(tab_id)
+            # Skip Same-Game-Parlay builder tabs: their markets overlap the other
+            # tabs and their slug is irregular (e.g. "same-game-parlay-").
+            if isinstance(meta, dict) and meta.get("isSameGameMulti") is True:
+                continue
             title = meta.get("title") if isinstance(meta, dict) else None
             slug = _slugify(str(title)) if title else _slugify(str(tab_id))
             if not slug or slug in slugs:

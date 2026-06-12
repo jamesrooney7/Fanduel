@@ -178,7 +178,7 @@ class TestDiscoverTabs:
                     "183": {"id": 183, "title": "Goal Scorer"},
                     "184": {"id": 184, "title": "Penalties"},
                     "211": {"id": 211, "title": "Assists"},
-                    "242": {"id": 242, "title": "Same Game Parlay™"},
+                    "242": {"id": 242, "title": "Same Game Parlay™", "isSameGameMulti": True},
                     "282": {"id": 282, "title": "Saves"},
                     "321": {"id": 321, "title": "Shots on Target"},
                     "387": {"id": 387, "title": "Quick Bets"},
@@ -187,8 +187,9 @@ class TestDiscoverTabs:
         }
         default_tab, tabs = discover_tabs(payload)
         assert default_tab == "popular"
+        # Same Game Parlay (id 242, isSameGameMulti) is skipped.
         assert tabs == [
-            "popular", "same-game-parlay", "goal-scorer", "goals", "quick-bets",
+            "popular", "goal-scorer", "goals", "quick-bets",
             "team-props", "half", "shots-on-target", "shots", "assists",
             "corners", "cards-fouls", "saves", "penalties",
         ]
