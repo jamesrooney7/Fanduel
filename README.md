@@ -55,7 +55,7 @@ git checkout claude/amazing-euler-s71b7e
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-playwright install chromium      # one-time: downloads the headless browser (~150 MB)
+python -m playwright install chromium   # one-time: downloads the headless browser (~150 MB)
 ```
 
 ---
@@ -106,7 +106,7 @@ them. Suspended markets and selections are included with their status in the
 
 | Symptom | What it means / what to do |
 |---|---|
-| **`error: Could not launch headless Chromium` / `Playwright is not installed`** | Run the one-time browser install: `playwright install chromium` (after `pip install -r requirements.txt`). |
+| **`error: Could not launch headless Chromium` / `Playwright is not installed`** | Run the one-time browser install: `python -m playwright install chromium` (after `pip install -r requirements.txt`). If the bare `playwright` command says "command not found", use the `python -m playwright` form. |
 | **`error: FanDuel rejected the ... request (HTTP 403)`** | You're not on an accepted connection. Run from a **US residential** network in a **legal state** and turn off any **VPN**. Cloud/datacenter IPs are always blocked. |
 | **`error: Event ... was not found`** | The game may have ended or been removed, or the URL/ID is wrong. Open the game in your browser and copy the URL again. |
 | **`error: ... did not match the expected shape` (schema drift)** | FanDuel changed their internal API. Re-run with `--dump-raw dumps/`, then send the JSON files from `dumps/` so the parser can be updated. |
